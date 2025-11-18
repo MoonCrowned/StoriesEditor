@@ -1,0 +1,11 @@
+{
+    "id": 4,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@marcus",
+            "message": "Привет еще раз, че как"
+        }
+    ],
+    "answers": []
+}

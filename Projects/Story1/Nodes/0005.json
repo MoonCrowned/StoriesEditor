@@ -1,0 +1,18 @@
+{
+    "id": 5,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@marcus",
+            "message": "Да че ты такой нервный"
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_5_1",
+            "message": "",
+            "delay": 0,
+            "next_node": null
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+    "id": 7,
+    "messages": [],
+    "answers": [
+        {
+            "id": "a_7_1",
+            "message": "2вцуа",
+            "delay": 0,
+            "next_node": 0
+        }
+    ]
+}

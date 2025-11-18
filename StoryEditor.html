@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Story Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<div id="app">
+    <div id="topBar">
+        <button id="btnSettings" class="icon-button" title="Story meta">
+            &#9881;
+        </button>
+        <button id="btnOpenProject" class="icon-button" title="Открыть или создать историю">
+            &#128193;
+        </button>
+        <button id="btnRefresh" class="icon-button" title="Обновить ноды из файлов">
+            &#8635;
+        </button>
+        <span id="projectLabel"></span>
+    </div>
+
+    <div id="editorRoot">
+        <div id="canvasContainer">
+            <div id="canvas">
+                <svg id="linksLayer"></svg>
+                <div id="nodesLayer"></div>
+            </div>
+        </div>
+        <div id="inspector"></div>
+    </div>
+
+    <div id="projectChooser" class="modal hidden">
+        <div class="modal-content" id="projectChooserContent"></div>
+    </div>
+
+    <div id="storyMetaModal" class="modal hidden">
+        <div class="modal-content" id="storyMetaContent"></div>
+    </div>
+</div>
+
+<script type="module" src="editor.js"></script>
+</body>
+</html>
