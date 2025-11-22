@@ -97,18 +97,23 @@ html, body {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     padding: 8px;
     min-width: 160px;
+    width: 220px;
+    box-sizing: border-box;
 }
 
 .node.selected {
     border-color: #00ff00;
+    border-width: 8px;
 }
 
 .node.path-before {
     border-color: #ffd000;
+    border-width: 8px;
 }
 
 .node.path-after {
     border-color: #3399ff;
+    border-width: 8px;
 }
 
 .node-messages {
@@ -117,6 +122,8 @@ html, body {
 
 .node-message-text {
     font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .node-message-block {
@@ -145,7 +152,8 @@ html, body {
     border: 1px solid #888;
     padding: 4px 6px;
     font-size: 12px;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
 }
 
 #inspector {

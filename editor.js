@@ -1,5 +1,7 @@
 // Basic skeleton for story editor SPA
 
+import { generateImageToImagesDir as generateChadImageToImagesDir } from './ChadAiApi/chad_ai_client.js';
+
 const canvasContainer = document.getElementById('canvasContainer');
 const canvas = document.getElementById('canvas');
 const linksLayer = document.getElementById('linksLayer');
@@ -13,9 +15,11 @@ const projectChooser = document.getElementById('projectChooser');
 const projectChooserContent = document.getElementById('projectChooserContent');
 const storyMetaModal = document.getElementById('storyMetaModal');
 const storyMetaContent = document.getElementById('storyMetaContent');
+const btnGenerateImages = document.getElementById('btnGenerateImages');
 
 btnSettings.disabled = true;
 btnRefresh.disabled = true;
+btnGenerateImages.disabled = true;
 
 let panX = -400;
 let panY = -300;
@@ -23,9 +27,15 @@ let zoom = 1;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOrigin = { x: 0, y: 0 };
+let didPan = false;
+let suppressCanvasClickUntil = 0;
 
-const NODE_COL_WIDTH = 260;
-const NODE_ROW_HEIGHT = 200;
+const NODE_WIDTH = 400;
+const NODE_HEIGHT = 280;
+const NODE_COL_GAP = 60;
+const NODE_ROW_GAP = 60;
+const NODE_COL_WIDTH = NODE_WIDTH + NODE_COL_GAP;
+const NODE_ROW_HEIGHT = NODE_HEIGHT + NODE_ROW_GAP;
 
 // Data for current project
 let projectsRootHandle = null; // directory containing story folders (optional)
@@ -36,6 +46,7 @@ let photosDirHandle = null;
 let videosDirHandle = null;
 let storyMetaHandle = null;
 let storyMeta = null;
+let chadApiRootDirHandle = null; // root directory for ChadAiApi (will contain Images subfolder)
 let nodes = new Map(); // id -> { data, fileHandle }
 let selectedNodeId = null;
 let nodeParents = new Map();
@@ -55,26 +66,51 @@ canvasContainer.addEventListener('pointerdown', (e) => {
     canvasContainer.classList.add('grabbing');
     panStart = { x: e.clientX, y: e.clientY };
     panOrigin = { x: panX, y: panY };
+    didPan = false;
 });
 
 window.addEventListener('pointermove', (e) => {
     if (!isPanning) return;
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
+    if (!didPan && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        didPan = true;
+    }
     panX = panOrigin.x + dx;
     panY = panOrigin.y + dy;
     updateCanvasTransform();
 });
 
 window.addEventListener('pointerup', () => {
+    if (didPan) {
+        suppressCanvasClickUntil = Date.now() + 100;
+        didPan = false;
+    }
     isPanning = false;
     canvasContainer.classList.remove('grabbing');
 });
 
 canvasContainer.addEventListener('wheel', (e) => {
     e.preventDefault();
+
+    const rect = canvasContainer.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const oldZoom = zoom;
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    zoom = Math.min(2.5, Math.max(0.25, zoom * zoomFactor));
+    let newZoom = oldZoom * zoomFactor;
+    newZoom = Math.min(2.5, Math.max(0.25, newZoom));
+
+    const worldX = (offsetX - centerX - panX) / oldZoom;
+    const worldY = (offsetY - centerY - panY) / oldZoom;
+
+    panX = offsetX - centerX - newZoom * worldX;
+    panY = offsetY - centerY - newZoom * worldY;
+
+    zoom = newZoom;
     updateCanvasTransform();
 }, { passive: false });
 
@@ -109,6 +145,19 @@ btnRefresh.addEventListener('click', async () => {
     } catch (err) {
         console.error(err);
         alert('Не удалось обновить ноды из файлов.');
+    }
+});
+
+btnGenerateImages.addEventListener('click', async () => {
+    if (!currentStoryHandle || !nodesDirHandle) {
+        alert('Сначала откройте историю.');
+        return;
+    }
+    try {
+        await generateOneMissingPhotoWithChad();
+    } catch (err) {
+        console.error('[ChadAi] unexpected error in button handler', err);
+        alert('Ошибка при генерации картинки. Подробности в консоли.');
     }
 });
 
@@ -291,6 +340,7 @@ async function openStory(handle, name) {
     projectLabel.textContent = name;
     btnSettings.disabled = false;
     btnRefresh.disabled = false;
+    btnGenerateImages.disabled = false;
 
     nodes.clear();
     selectedNodeId = null;
@@ -423,6 +473,122 @@ async function loadPhotoPreview(fileName, imgEl) {
     }
 }
 
+async function ensureChadApiRootHandle() {
+    if (chadApiRootDirHandle) {
+        return chadApiRootDirHandle;
+    }
+    try {
+        const handle = await window.showDirectoryPicker({
+            id: 'chad-ai-api-root',
+            mode: 'readwrite'
+        });
+        if (handle.name !== 'ChadAiApi') {
+            console.warn('[ChadAi] Selected directory is not ChadAiApi', { name: handle.name });
+            alert(`Пожалуйста, выберите именно папку "ChadAiApi", а не "${handle.name}".`);
+            return null;
+        }
+        chadApiRootDirHandle = handle;
+        console.log('[ChadAi] ChadAiApi root directory selected', { name: handle.name });
+        return handle;
+    } catch (err) {
+        if (err && err.name === 'AbortError') {
+            console.warn('[ChadAi] Directory selection cancelled by user');
+            return null;
+        }
+        console.error('[ChadAi] Failed to pick ChadAiApi directory', err);
+        throw err;
+    }
+}
+
+async function generateOneMissingPhotoWithChad() {
+    if (!currentStoryHandle || !nodesDirHandle || !photosDirHandle) {
+        console.warn('[ChadAi] Story or directories are not ready');
+        return;
+    }
+
+    const chadRoot = await ensureChadApiRootHandle();
+    if (!chadRoot) {
+        alert('Не выбрана папка ChadAiApi. Повторите попытку и выберите её в диалоге.');
+        return;
+    }
+
+    console.log('[ChadAi] scanning nodes for photo messages with description and empty photo_file');
+
+    const ids = Array.from(nodes.keys()).sort((a, b) => a - b);
+    let processedAny = false;
+
+    for (const id of ids) {
+        const wrap = nodes.get(id);
+        if (!wrap) continue;
+        const node = wrap.data;
+        if (!node || !Array.isArray(node.messages)) continue;
+
+        for (let index = 0; index < node.messages.length; index++) {
+            const msg = node.messages[index];
+            if (!msg || msg.type !== 'photo') continue;
+            const hasDescription = typeof msg.photo_description === 'string' && msg.photo_description.trim().length > 0;
+            const hasFile = typeof msg.photo_file === 'string' && msg.photo_file.trim().length > 0;
+            if (!hasDescription || hasFile) continue;
+
+            console.log('[ChadAi] found candidate', {
+                nodeId: node.id,
+                messageIndex: index,
+                photo_description: msg.photo_description
+            });
+
+            processedAny = true;
+
+            try {
+                const prompt = msg.photo_description;
+                const aspect = '9:16';
+                console.log('[ChadAi] calling generateChadImageToImagesDir', {
+                    nodeId: node.id,
+                    messageIndex: index,
+                    prompt,
+                    aspect
+                });
+
+                const result = await generateChadImageToImagesDir(prompt, aspect, chadRoot, { extension: 'png' });
+
+                console.log('[ChadAi] image generated and saved to ChadAiApi/Images', {
+                    nodeId: node.id,
+                    messageIndex: index,
+                    result
+                });
+
+                const copiedHandle = await copyFileToDir(result.fileHandle, photosDirHandle);
+
+                msg.photo_file = copiedHandle.name;
+                scheduleSaveNode(node.id);
+
+                console.log('[ChadAi] photo_file assigned and node scheduled for save', {
+                    nodeId: node.id,
+                    messageIndex: index,
+                    photo_file: msg.photo_file
+                });
+
+                if (selectedNodeId === node.id) {
+                    updateInspector();
+                    layoutAndRenderGraph();
+                } else {
+                    redrawNodeBox(node.id);
+                    relayoutLinksFromDom();
+                }
+            } catch (err) {
+                console.error('[ChadAi] error while generating image for node', {
+                    nodeId: node.id,
+                    messageIndex: index,
+                    error: err
+                });
+            }
+        }
+    }
+
+    if (!processedAny) {
+        console.log('[ChadAi] no suitable messages found (need photo_description and empty photo_file)');
+    }
+}
+
 function getDefaultSenderId() {
     if (storyMeta && Array.isArray(storyMeta.characters) && storyMeta.characters.length) {
         return storyMeta.characters[0].id;
@@ -538,19 +704,33 @@ function layoutAndRenderGraph() {
     for (const arr of columnToIds.values()) arr.sort((a, b) => a - b);
 
     const colWidth = NODE_COL_WIDTH;
-    const rowHeight = NODE_ROW_HEIGHT;
 
     nodesLayer.innerHTML = '';
     linksLayer.innerHTML = '';
 
     const posById = new Map();
 
+    // Первый проход: создаём DOM-элементы нод с временной вертикальной позицией
     for (const [col, nodeIds] of Array.from(columnToIds.entries()).sort((a, b) => a[0] - b[0])) {
-        nodeIds.forEach((id, index) => {
-            const x = col * colWidth;
-            const y = index * rowHeight;
-            posById.set(id, { x, y });
+        const x = col * colWidth;
+        nodeIds.forEach((id) => {
+            const y = 0;
             renderNodeBox(id, nodes.get(id).data, x, y);
+        });
+    }
+
+    // Второй проход: измеряем фактическую высоту нод и раскладываем их с отступами по колонкам
+    for (const [col, nodeIds] of Array.from(columnToIds.entries()).sort((a, b) => a[0] - b[0])) {
+        const x = col * colWidth;
+        let yCursor = 0;
+        nodeIds.forEach((id) => {
+            const el = nodesLayer.querySelector(`.node[data-node-id="${id}"]`);
+            if (!el) return;
+            const height = el.offsetHeight || NODE_HEIGHT;
+            el.style.left = x + 'px';
+            el.style.top = yCursor + 'px';
+            posById.set(id, { x, y: yCursor });
+            yCursor += height + NODE_ROW_GAP;
         });
     }
 
@@ -559,7 +739,7 @@ function layoutAndRenderGraph() {
         const nodeData = nodeWrap.data;
         const fromPos = posById.get(id);
         if (!fromPos) continue;
-        const baseX = fromPos.x + 180; // approx right edge
+        const baseX = fromPos.x + NODE_WIDTH - 10; // approx right edge
         const baseY = fromPos.y + 40;
         let offset = 0;
         for (const ans of nodeData.answers || []) {
@@ -586,10 +766,16 @@ function renderNodeBox(id, nodeData, x, y) {
     el.className = 'node';
     el.style.left = x + 'px';
     el.style.top = y + 'px';
+    el.style.width = NODE_WIDTH + 'px';
+    el.style.boxSizing = 'border-box';
     el.dataset.nodeId = String(id);
     fillNodeBoxContent(el, nodeData);
 
     el.addEventListener('click', (e) => {
+        if (Date.now() < suppressCanvasClickUntil) {
+            e.stopPropagation();
+            return;
+        }
         e.stopPropagation();
         selectNode(id);
     });
@@ -703,7 +889,7 @@ function relayoutLinksFromDom() {
         const nodeData = nodeWrap.data;
         const fromPos = posById.get(id);
         if (!fromPos) continue;
-        const baseX = fromPos.x + 180;
+        const baseX = fromPos.x + NODE_WIDTH - 10;
         const baseY = fromPos.y + 40;
         let offset = 0;
         for (const ans of nodeData.answers || []) {
@@ -742,6 +928,16 @@ function selectNode(id) {
         }
     } else {
         selectedNodeId = null;
+    }
+
+    const pathAfterIds = new Set();
+
+    if (selectedNodeId != null) {
+        for (const [childId, parents] of nodeParents.entries()) {
+            if (parents && parents.has(selectedNodeId)) {
+                pathAfterIds.add(childId);
+            }
+        }
     }
 
     // Vertically align highlighted nodes (ancestors + selected) across columns
@@ -793,6 +989,8 @@ function selectNode(id) {
             el.classList.add('selected');
         } else if (pathBeforeIds.has(nodeId)) {
             el.classList.add('path-before');
+        } else if (pathAfterIds.has(nodeId)) {
+            el.classList.add('path-after');
         }
     }
 
@@ -887,6 +1085,9 @@ function updateInspector() {
 
 // Click on empty canvas clears selection
 canvasContainer.addEventListener('click', (e) => {
+    if (Date.now() < suppressCanvasClickUntil) {
+        return;
+    }
     if (e.target.closest && e.target.closest('.node')) {
         return;
     }
@@ -1031,6 +1232,10 @@ function createMessageBlock(node, msg, index) {
         fileName.textContent = msg.photo_file || '(файл не выбран)';
         block.appendChild(fileName);
 
+        const buttonsRow = document.createElement('div');
+        buttonsRow.style.display = 'flex';
+        buttonsRow.style.gap = '4px';
+
         const chooseBtn = document.createElement('button');
         chooseBtn.textContent = 'Выбрать фото';
         chooseBtn.className = 'small';
@@ -1061,7 +1266,32 @@ function createMessageBlock(node, msg, index) {
                 alert('Не удалось выбрать фото.');
             }
         });
-        block.appendChild(chooseBtn);
+        buttonsRow.appendChild(chooseBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '-';
+        deleteBtn.className = 'small danger';
+        deleteBtn.addEventListener('click', async () => {
+            if (!msg.photo_file) {
+                return;
+            }
+            if (!photosDirHandle) {
+                alert('Папка Photos не найдена.');
+                return;
+            }
+            try {
+                await photosDirHandle.removeEntry(msg.photo_file);
+            } catch (err) {
+                console.error('Не удалось удалить файл фото', err);
+            }
+            msg.photo_file = '';
+            scheduleSaveNode(node.id);
+            updateInspector();
+            layoutAndRenderGraph();
+        });
+        buttonsRow.appendChild(deleteBtn);
+
+        block.appendChild(buttonsRow);
 
         const textLabel2 = document.createElement('label');
         textLabel2.className = 'field-label';
