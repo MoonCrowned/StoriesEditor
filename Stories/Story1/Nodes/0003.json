@@ -2,22 +2,19 @@
     "id": 3,
     "messages": [
         {
+            "type": "text",
+            "sender": "@marcus",
+            "message": "эх бро.."
+        },
+        {
             "type": "system",
             "message": "Маркус перестал выходить на связь"
         }
     ],
     "answers": [
-        {
-            "id": "a_3_1",
-            "message": "123",
-            "delay": 0,
-            "next_node": 6
-        },
-        {
-            "id": "a_3_2",
-            "message": "456",
-            "delay": 0,
-            "next_node": 7
-        }
-    ]
+    ],
+    "ending":
+    {
+        "description": "Вы проигнорировали Маркуса"
+    }
 }

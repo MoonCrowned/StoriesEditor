@@ -1,0 +1,23 @@
+{
+    "id": 28,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Дал ему по ребрам. Он скрючился."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Не горжусь этим, но выхода не было."
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_28_1",
+            "message": "Ты выжил. Это главное.",
+            "delay": 2,
+            "next_node": 24
+        }
+    ]
+}

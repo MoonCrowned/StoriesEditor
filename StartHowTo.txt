@@ -1,6 +1,0 @@
-anaconda promt
-
-cd C:\Documents\My\StoriesEditor
-start "" python -m http.server 8000
-start "" python ChadAiApi\chad_ai_proxy.py
-http://localhost:8000/StoryEditor.html

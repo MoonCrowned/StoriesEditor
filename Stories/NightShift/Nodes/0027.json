@@ -1,0 +1,23 @@
+{
+    "id": 27,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Кинул камень в сторону. Они ломанулись туда."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Я прополз под кустами и вышел к дороге."
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_27_1",
+            "message": "Вали оттуда.",
+            "delay": 2,
+            "next_node": 24
+        }
+    ]
+}

@@ -1,0 +1,34 @@
+{
+    "id": 42,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Стук в дверь. Тихий, уверенный."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Голос за дверью: 'Рум сервис. Открывайте'."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "В 3 часа ночи? Это они."
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_42_1",
+            "message": "Стреляй через дверь!",
+            "delay": 2,
+            "next_node": 45
+        },
+        {
+            "id": "a_42_2",
+            "message": "В окно! Быстрее!",
+            "delay": 2,
+            "next_node": 48
+        }
+    ]
+}

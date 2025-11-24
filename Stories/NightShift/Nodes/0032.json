@@ -1,0 +1,18 @@
+{
+    "id": 32,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Ты прав. Это ловушка. Я иду к Кате."
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_32_1",
+            "message": "Давай.",
+            "delay": 1,
+            "next_node": 34
+        }
+    ]
+}

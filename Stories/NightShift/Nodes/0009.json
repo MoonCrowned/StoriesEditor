@@ -1,0 +1,39 @@
+{
+    "id": 9,
+    "messages": [
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Я ответил. Руки трясутся."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Голос... жуткий. Спокойный такой, механический."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "Он сказал: 'Алекс. Не беги. Ты собьешь дыхание'."
+        },
+        {
+            "type": "text",
+            "sender": "@alex",
+            "message": "ОН ЗНАЕТ МОЕ ИМЯ!"
+        }
+    ],
+    "answers": [
+        {
+            "id": "a_9_1",
+            "message": "Спроси, что ему нужно.",
+            "delay": 3,
+            "next_node": 14
+        },
+        {
+            "id": "a_9_2",
+            "message": "Бросай телефон и беги!",
+            "delay": 2,
+            "next_node": 10
+        }
+    ]
+}
